@@ -185,6 +185,14 @@ fi
 
 # init of main variables
 DEV="/dev/${1}"
+if echo "${1}" | grep -q "p"
+then
+  DISK=$( echo "${1}" | cut -d 'p' -f 1 )
+  PART=$( echo "${1}" | cut -d 'p' -f 2 )
+else
+  DISK=$( echo "${1}" | cut -d 's' -f 1 )
+  PART=$( echo "${1}" | cut -d 's' -f 2 )
+fi
 MNT="${MNT_PREFIX}/${1}"
 UID=$( id -u ${USER} )
 GID=$( pw group show -n ${MNT_GROUP} | awk -F':' '{print $3}' )
@@ -338,6 +346,15 @@ __show_message() { # 1=MESSAGE
   esac
 }
 
+# FUNCTION: check if device not efi pa
+__check_if_efi() { # 1=DEV 2=DISK 3=PART
+  if gpart show ${2} | grep " ${3} " | grep -q "efi"
+  then
+    __log "${1}: is a UEFI mount point"
+    exit 1
+  fi
+}
+
 # FUNCTION: check if device or mountpoint not already mounted
 __check_already_mounted() { # 1=DEV 2=MNT
   local MOUNT=$( mount )
@@ -431,6 +448,13 @@ case ${2} in
         FS_TYPE=${?}
         ;;
       (da*|mmcsd*)
+        __check_if_efi "${DEV}" "${DISK}" "${PART}"
+        __check_block_device "${DEV}"
+        __guess_fs_type "${DEV}"
+        FS_TYPE=${?}
+        ;;
+      (ada*)
+        __check_if_efi "${DEV}" "${DISK}" "${PART}"
         __check_block_device "${DEV}"
         __guess_fs_type "${DEV}"
         FS_TYPE=${?}
